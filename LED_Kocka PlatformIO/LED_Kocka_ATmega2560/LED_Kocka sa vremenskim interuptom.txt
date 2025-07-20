@@ -1,0 +1,244 @@
+#include <Arduino.h>
+#include <SPI.h>
+
+//PIN CONSTANTS
+const uint8_t interrupt_pin = 46;
+
+//CUBE VARIABLES
+volatile uint8_t xPin[8][3];
+volatile uint8_t yPin[8];
+volatile uint8_t zPin[8];
+
+volatile uint8_t cubeState [8][8][3];
+
+volatile uint8_t current_y_position;
+volatile uint8_t previous_y_position;
+volatile uint8_t current_z_position;
+volatile uint8_t previous_z_position;
+
+//DECLARATIONS
+void setFramerate(float frames_per_second);
+
+//SPI VARABLES
+volatile uint8_t cube_row_buffer [3]; //New
+volatile uint8_t reception_counter = 0;
+volatile bool reception_done = 0;
+
+void setup() {
+  //CUBE PINOUT
+  xPin[0][0] = 29;
+  xPin[0][1] = 37;
+  xPin[0][2] = 45;
+
+  xPin[1][0] = 28;
+  xPin[1][1] = 36;
+  xPin[1][2] = 44;
+
+  xPin[2][0] = 27;
+  xPin[2][1] = 35;
+  xPin[2][2] = 43;
+
+  xPin[3][0] = 26;
+  xPin[3][1] = 34;
+  xPin[3][2] = 42;
+
+  xPin[4][0] = 25;
+  xPin[4][1] = 33;
+  xPin[4][2] = 41;
+
+  xPin[5][0] = 24;
+  xPin[5][1] = 32;
+  xPin[5][2] = 40;
+
+  xPin[6][0] = 23;
+  xPin[6][1] = 31;
+  xPin[6][2] = 39;
+
+  xPin[7][0] = 22;
+  xPin[7][1] = 30;
+  xPin[7][2] = 38;
+ 
+  yPin[0] = 21;
+  yPin[1] = 20;
+  yPin[2] = 19;
+  yPin[3] = 18;
+  yPin[4] = 17;
+  yPin[5] = 16;
+  yPin[6] = 15;
+  yPin[7] = 14;
+ 
+  zPin[0] = 9;
+  zPin[1] = 8;
+  zPin[2] = 7;
+  zPin[3] = 6;
+  zPin[4] = 5;
+  zPin[5] = 4;
+  zPin[6] = 3;
+  zPin[7] = 2;
+
+  //CUBE STATE INITIALISATION
+  for(uint8_t z_pos = 0; z_pos < 8; z_pos++)
+  {
+    for(uint8_t y_pos = 0; y_pos < 8; y_pos++)
+    {
+      for(uint8_t color = 0; color < 3; color++)
+      {
+        cubeState[y_pos][z_pos][color] = 0;
+      }
+    }
+  }
+ 
+  //CUBE PIN INITIALISATION
+  for(unsigned short count = 0; count < 8; count++)
+  {
+    for(unsigned int color = 0; color < 3; color++)
+    {
+      pinMode(xPin[count][color], OUTPUT);
+      digitalWrite(xPin[count][color], LOW);
+    }
+    pinMode(yPin[count], OUTPUT);
+    digitalWrite(yPin[count], LOW);
+
+    pinMode(zPin[count], OUTPUT);
+    digitalWrite(zPin[count], LOW);
+  }
+
+  current_y_position = 0;
+  previous_y_position = 0;
+  current_z_position = 0;
+  previous_z_position = 0;
+
+  //SPI
+  Serial.begin (9600);
+  SPCR |= bit(SPE);         /* Enable SPI */
+  pinMode(MISO, OUTPUT);    /* Make MISO pin as OUTPUT */
+  
+  SPI.attachInterrupt();    /* Attach SPI interrupt */
+
+  //Frame interupt
+  setFramerate(50);
+
+  pinMode(interrupt_pin, OUTPUT);
+  digitalWrite(interrupt_pin, LOW);
+}
+
+void loop()
+{
+
+}
+
+//FUNCTIONS
+/***************************************************************************************************/
+
+// SPI interrupt routine
+ISR (SPI_STC_vect)
+{
+  uint8_t oldsrg = SREG;    //Disables interrupst
+  cli();
+
+  cubeState[current_y_position][current_z_position][reception_counter] = SPDR;
+
+  reception_counter++;
+  if(reception_counter == 3)
+  {
+    reception_counter = 0;
+    reception_done = true;
+    //Serial.println("Reception done");
+  }
+
+  SREG = oldsrg;
+}
+
+//Frame inrerupt
+ISR(TIMER5_COMPA_vect)
+{
+  interrupts();
+  reception_done = false;
+  digitalWrite(interrupt_pin, HIGH);
+  //digitalWrite(LED_BUILTIN, HIGH);
+  while(!reception_done){};
+  //noInterrupts();
+
+  digitalWrite(zPin[previous_z_position], LOW);
+  digitalWrite(yPin[previous_y_position], LOW);
+
+  for(uint8_t x_position = 0; x_position < 8; x_position++)
+  {
+    for(uint8_t color = 0; color < 3; color++)
+    {
+      if(((cubeState[current_y_position][current_z_position][color] >> x_position) & 1U)) digitalWrite(xPin[x_position][color], HIGH);
+      else digitalWrite(xPin[x_position][color], LOW);
+    }
+  }
+
+  digitalWrite(yPin[current_y_position], HIGH);
+  digitalWrite(zPin[current_z_position], HIGH);
+ 
+  previous_y_position = current_y_position;
+  previous_z_position = current_z_position;
+
+  if(current_y_position < 7) current_y_position++;
+  else
+  {
+    current_y_position = 0;
+    if(current_z_position < 7) current_z_position++;
+    else
+    {
+      current_z_position = 0;
+    }
+  }
+  digitalWrite(interrupt_pin, LOW);
+  //digitalWrite(LED_BUILTIN, LOW);
+  //delay(1000);
+}
+//FUNCTIONS
+/***************************************************************************************************/
+void setFramerate(float frames_per_second)
+{
+  long double float_output_compare = 0.0;
+  uint64_t int_output_compare = 0;
+  uint16_t prescaler = 0;
+  uint8_t counter = 0;
+
+  do
+  {
+    if(counter == 0) prescaler = 1;
+    if(counter == 1) prescaler = 8;
+    if(counter == 2) prescaler = 64;
+    if(counter == 3) prescaler = 256;
+    if(counter == 4) prescaler = 1024;
+    float_output_compare = ((16000000.0 / (prescaler * 8.0 * 8.0 * frames_per_second)) - 1.0);
+    int_output_compare = round(float_output_compare);
+    counter++;
+  }
+  while(int_output_compare > 65535);
+
+  cli();//stop interrupts
+  TCCR5A = 0;// set entire TCCR1A register to 0
+  TCCR5B = 0;// same for TCCR1B
+  TCNT5  = 0;//initialize counter value to 0
+  OCR5A = int_output_compare;
+  TCCR5B |= (1 << WGM12);
+
+  switch(prescaler)
+  {
+    case 1:
+    TCCR5B |= (1 << CS10);  
+    break;
+    case 8:
+    TCCR5B |= (1 << CS11);  
+    break;
+    case 64:
+    TCCR5B |= (1 << CS11) | (1 << CS10); 
+    break;
+    case 256:
+    TCCR5B |= (1 << CS12); 
+    break;
+    case 1024:
+     TCCR5B |= (1 << CS10) | (1 << CS12);   
+    break;
+  }
+  
+  TIMSK5 |= (1 << OCIE4A);
+  sei();//allow interrupts
+}
