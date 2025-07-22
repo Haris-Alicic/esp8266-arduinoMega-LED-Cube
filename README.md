@@ -4,7 +4,7 @@ This project is a fully functional **8×8×8 RGB LED cube**, built using **commo
 
 ---
 
-## 📐 Overview
+## Overview
 
 - **Size**: 8×8×8 (512 RGB LEDs)
 - **Colors**: Red, Green, Blue (3 channels per LED)
@@ -16,7 +16,7 @@ This project is a fully functional **8×8×8 RGB LED cube**, built using **commo
 
 ---
 
-## ⚙️ How It Works
+## How It Works
 
 The cube is driven by scanning through each of the 64 available 8-LED positions (8 Z layers × 8 Y rows), and lighting them up with RGB values using fast multiplexing. The structure is divided into three control sections:
 
@@ -37,7 +37,7 @@ The cube is driven by scanning through each of the 64 available 8-LED positions 
 
 ---
 
-## 🧠 Persistence of Vision
+## Persistence of Vision
 
 Only one Z-layer and one Y-row are active at any moment. By cycling quickly through all combinations and updating RGB data each time, the viewer perceives a fully lit, animated 3D structure.
 
@@ -45,7 +45,7 @@ Only one Z-layer and one Y-row are active at any moment. By cycling quickly thro
 
 ---
 
-## 🧰 Requirements
+## Requirements
 
 - Common-anode RGB LEDs (512×)
 - 2N3904 NPN transistors (200+)
@@ -57,7 +57,7 @@ Only one Z-layer and one Y-row are active at any moment. By cycling quickly thro
 ---
 
 Code Architecture – 8×8×8 RGB LED Cube (Dual-MCU SPI System)
-⚙️ Why Two MCUs?
+Why Two MCUs?
 Controlling a 512 RGB LED cube (8×8×8 = 512 voxels × 3 colors = 1,536 channels) in real-time is computationally intense. This setup offloads responsibilities:
 
 MCU 1 (Master): Handles animation logic, voxel mapping, and prepares raw frame data.
@@ -66,7 +66,7 @@ MCU 2 (Slave): Dedicated to real-time LED driving, extremely timing-sensitive, h
 
 This separation ensures animation doesn’t interrupt LED scanning or cause flicker.
 
-📡 Data Protocol Between MCUs (SPI)
+Data Protocol Between MCUs (SPI)
 SPI is used for fast unidirectional communication: MCU 1 sends precomputed row data to MCU 2.
 
 Data is transferred in chunks: each row of the cube (Z-layer and Y-row) gets a 4-5 byte packet:
@@ -79,13 +79,13 @@ R[8 bits], G[8 bits], B[8 bits] → represent the 8 LEDs along the X-axis.
 
 This allows for full row update in a single transfer, with low latency and synchronization.
 
-🧨 MCU 2 – Driving Code Breakdown (Performance-Oriented)
-✅ Real-Time Framebuffering with Interrupts
+MCU 2 – Driving Code Breakdown (Performance-Oriented)
+Real-Time Framebuffering with Interrupts
 SPI interrupt is heavily optimized to read the incoming frame data and store it immediately into RAM buffers.
 
 When a full row (Z×Y) is received, it’s latched into the display output routine.
 
-⚡ Ultra-fast Output Using digitalWriteFast.h
+Ultra-fast Output Using digitalWriteFast.h
 You’re not using loops or abstractions here. Each of the 1,536 possible LED states is manually unrolled.
 
 Code uses explicit digitalWriteFast() calls for each possible LED transistor combination:
@@ -95,7 +95,7 @@ if (r & (1 << 0)) digitalWriteFast(R0_PIN, HIGH);
 ...
 This avoids function call overhead and ensures deterministic timing—no delay, no jitter, crucial for persistence of vision.
 
-🔁 Multiplexing Strategy
+Multiplexing Strategy
 Only one Y-row and Z-layer is active at a time.
 
 MCU 2 activates a layer (Z) and a row (Y) by toggling the appropriate transistor drivers.
@@ -104,7 +104,7 @@ Then it pushes RGB values to the 24 output pins driving the BJT arrays along X-a
 
 The sequence is repeated at ~1000 Hz or more, fast enough for human eyes to perceive a stable 3D image.
 
-🧬 Why So Many Lines of Code?
+Why So Many Lines of Code?
 Because MCU 2 must:
 
 Control 1,536 transistors explicitly.
@@ -121,7 +121,7 @@ No framebuffer shifting.
 
 Just raw, unrolled, brute-force control optimized for interrupt latency and memory predictability.
 
-🛠️ Summary of Code Flow
+Summary of Code Flow
 MCU 1 (Master):
 Runs animation logic (procedural or lookup-table based).
 
