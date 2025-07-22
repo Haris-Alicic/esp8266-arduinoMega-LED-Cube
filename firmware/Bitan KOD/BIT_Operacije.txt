@@ -1,0 +1,48 @@
+#include <iostream>
+#include <bitset>
+#include <string>
+
+using namespace std;
+
+int main()
+{
+    uint8_t my_register = 255;
+    uint8_t check_bit = 0;
+    int16_t bit = 0;
+    int16_t unf_bit = 0;
+    int16_t bit_number = 0;
+    
+    string string_my_register;
+    string string_shifter;
+    
+    string_my_register = std::bitset<8>(my_register).to_string();
+    cout << "REG: " << string_my_register << endl;
+    
+    while(true)
+    {
+        cout << "Enter bit number: ";
+        cin >> bit_number;
+    
+        cout << "Enter bit value: ";
+        cin >> unf_bit;
+        bit = !!unf_bit;
+    
+        //my_register |= 1U << bit_number; //Set bit to 1
+        //my_register &= ~(1U << bit_number); //Reset bit to 0
+        //my_register ^= 1U << bit_number; //Toggle bit
+        my_register = (my_register & ~(1U << bit_number)) | (bit << bit_number);
+        
+        cout << "REG: ";
+        for(int16_t counter = 0; counter < 8; counter++)
+        {
+            check_bit = (my_register >> counter) & 1U;
+            cout << check_bit;
+        }
+        cout << endl;
+        
+        string_my_register = std::bitset<8>(my_register).to_string();
+        cout << "REG: " << string_my_register << endl;
+        }
+    
+    return 0;
+}
