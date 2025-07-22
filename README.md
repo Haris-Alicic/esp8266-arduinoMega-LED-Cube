@@ -119,7 +119,7 @@ No DMA.
 
 No framebuffer shifting.
 
-Just raw, unrolled, brute-force control optimized for interrupt latency and memory predictability.
+Just control optimized for interrupt latency and memory predictability.
 
 Summary of Code Flow
 MCU 1 (Master):
